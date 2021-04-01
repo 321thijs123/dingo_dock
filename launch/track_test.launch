@@ -1,0 +1,5 @@
+<launch>
+  <node type="rviz" name="rviz" pkg="rviz" output="screen" args="-d $(find dingo_dock)/rviz/lidar.rviz" />
+  <node pkg="rosbag" name="bag_player" type="play" args="--loop --clock $(find dingo_dock)/rosbag/tube.bag"/>
+  <node type="cloudfilter" name="cloudfilter" pkg="dingo_dock" output="screen"/>
+</launch>
