@@ -2,7 +2,7 @@
 ## Cloudfilter
 The cloudfilter node is used to filter out all points except the tube.
 ```
-rosrun dingo_dock cloudfilter.cpp
+rosrun dingo_dock cloudfilter
 ```
 
 ## rviz.launch
