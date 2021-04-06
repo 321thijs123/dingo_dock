@@ -38,6 +38,7 @@ void cloudCallback(const sensor_msgs::PointCloud2 msg)
 
 	convertPointCloud2ToPointCloud(msg, cloud);
 	
+	//Only keep points between a height of -5 and 5 centimeters
 	std::vector<geometry_msgs::Point32> layer_points = {};
 	
 	for (int i = 0; i < cloud.points.size(); i++){
@@ -46,6 +47,7 @@ void cloudCallback(const sensor_msgs::PointCloud2 msg)
 		}
 	}
 
+	// Only keep objects smaller than 15cm with 30cm of clearance from its center 
 	std::vector<geometry_msgs::Point32> object_points = {};
 
 	for (int i = 0; i < layer_points.size(); i++){
@@ -65,9 +67,29 @@ void cloudCallback(const sensor_msgs::PointCloud2 msg)
 
 		if (keep) object_points.push_back(layer_points[i]);
 	}
+
+	// Remove groups of less than 5 points
+	std::vector<geometry_msgs::Point32> size_object_points = {};
+
+	for (int i = 0; i < object_points.size(); i++){
+		int count = 0;
+
+		for (int j = 0; j < object_points.size(); j++){
+			float distance =	(object_points[i].x-object_points[j].x)*
+								(object_points[i].x-object_points[j].x)+
+								(object_points[i].y-object_points[j].y)*
+								(object_points[i].y-object_points[j].y);
+
+			if (distance  < 0.15*0.15){
+				count++;
+			}
+		}
+
+		if (count > 5) size_object_points.push_back(object_points[i]);
+	}
 	
 	filtered_cloud.header = cloud.header;
-	filtered_cloud.points = object_points;
+	filtered_cloud.points = size_object_points;
 
-	ROS_INFO("%lu points in %.2f seconds", object_points.size(), ros::Time::now().toSec()-startTime);
+	ROS_INFO("%lu points in %.2f seconds", size_object_points.size(), ros::Time::now().toSec()-startTime);
 }
