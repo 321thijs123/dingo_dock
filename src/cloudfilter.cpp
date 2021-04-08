@@ -13,13 +13,9 @@ public:
 		sub = n.subscribe("velodyne_points", 100, &CloudFilter::cloudCallback, this);
 	}
 
-	void cloudCallback(const sensor_msgs::PointCloud2 &msg)
+	// Only keep points between a height of -5 and 5 centimeters
+	std::vector<geometry_msgs::Point32> filterLayers(sensor_msgs::PointCloud cloud)
 	{
-		double startTime = ros::Time::now().toSec();
-		sensor_msgs::PointCloud cloud;
-
-		convertPointCloud2ToPointCloud(msg, cloud);
-
 		std::vector<geometry_msgs::Point32> layer_points = {};
 
 		for (int i = 0; i < cloud.points.size(); i++)
@@ -30,6 +26,12 @@ public:
 			}
 		}
 
+		return layer_points;
+	}
+
+	// Only keep objects smaller than 15cm with 30cm of clearance from its center
+	std::vector<geometry_msgs::Point32> filterObjects(std::vector<geometry_msgs::Point32> layer_points)
+	{
 		std::vector<geometry_msgs::Point32> object_points = {};
 
 		for (int i = 0; i < layer_points.size(); i++)
@@ -54,7 +56,12 @@ public:
 				object_points.push_back(layer_points[i]);
 		}
 
-		// Remove groups of less than 5 points
+		return object_points;
+	}
+
+	// Remove groups of less than 5 points
+	std::vector<geometry_msgs::Point32> removeGroups(std::vector<geometry_msgs::Point32> object_points)
+	{
 		std::vector<geometry_msgs::Point32> size_object_points = {};
 
 		for (int i = 0; i < object_points.size(); i++)
@@ -77,6 +84,22 @@ public:
 			if (count > 5)
 				size_object_points.push_back(object_points[i]);
 		}
+
+		return size_object_points;
+	}
+	
+	void cloudCallback(const sensor_msgs::PointCloud2 &msg)
+	{
+		double startTime = ros::Time::now().toSec();
+		sensor_msgs::PointCloud cloud;
+
+		convertPointCloud2ToPointCloud(msg, cloud);
+
+		std::vector<geometry_msgs::Point32> layer_points = filterLayers(cloud);
+
+		std::vector<geometry_msgs::Point32> object_points = filterObjects(layer_points);
+
+		std::vector<geometry_msgs::Point32> size_object_points = removeGroups(object_points);
 
 		filtered_cloud.header = cloud.header;
 		filtered_cloud.points = size_object_points;
