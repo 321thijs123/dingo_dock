@@ -29,21 +29,38 @@ public:
 		return layer_points;
 	}
 
-	// Only keep objects smaller than 15cm with 30cm of clearance from its center
-	std::vector<geometry_msgs::Point32> filterObjects(std::vector<geometry_msgs::Point32> layer_points)
+	// Orientation filter
+	std::vector<geometry_msgs::Point32> filterOrientation(std::vector<geometry_msgs::Point32> layer_points)
 	{
-		std::vector<geometry_msgs::Point32> object_points = {};
+		std::vector<geometry_msgs::Point32> orientation_points = {};
 
 		for (int i = 0; i < layer_points.size(); i++)
 		{
+		
+			if (layer_points[i].x > 0 )
+			{
+				orientation_points.push_back(layer_points[i]);
+			}
+		}
+
+		return orientation_points;
+	}
+	
+	// Only keep objects smaller than 15cm with 30cm of clearance from its center
+	std::vector<geometry_msgs::Point32> filterObjects(std::vector<geometry_msgs::Point32> orientation_points)
+	{
+		std::vector<geometry_msgs::Point32> object_points = {};
+
+		for (int i = 0; i < orientation_points.size(); i++)
+		{
 			bool keep = true;
 
-			for (int j = 0; j < layer_points.size(); j++)
+			for (int j = 0; j < orientation_points.size(); j++)
 			{
-				float distance = (layer_points[i].x - layer_points[j].x) *
-									 (layer_points[i].x - layer_points[j].x) +
-								 (layer_points[i].y - layer_points[j].y) *
-									 (layer_points[i].y - layer_points[j].y);
+				float distance = (orientation_points[i].x - orientation_points[j].x) *
+									 (orientation_points[i].x - orientation_points[j].x) +
+								 (orientation_points[i].y - orientation_points[j].y) *
+									 (orientation_points[i].y - orientation_points[j].y);
 
 				if (distance > 0.15 * 0.15 && distance < 0.30 * 0.30)
 				{
@@ -53,7 +70,7 @@ public:
 			}
 
 			if (keep)
-				object_points.push_back(layer_points[i]);
+				object_points.push_back(orientation_points[i]);
 		}
 
 		return object_points;
@@ -97,7 +114,9 @@ public:
 
 		std::vector<geometry_msgs::Point32> layer_points = filterLayers(cloud);
 
-		std::vector<geometry_msgs::Point32> object_points = filterObjects(layer_points);
+		std::vector<geometry_msgs::Point32> orientation_points = filterOrientation(layer_points);
+
+		std::vector<geometry_msgs::Point32> object_points = filterObjects(orientation_points);
 
 		std::vector<geometry_msgs::Point32> size_object_points = removeGroups(object_points);
 
