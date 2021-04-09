@@ -62,7 +62,7 @@ public:
 								 (orientation_points[i].y - orientation_points[j].y) *
 									 (orientation_points[i].y - orientation_points[j].y);
 
-				if (distance > 0.15 * 0.15 && distance < 0.30 * 0.30)
+				if (distance > 0.06 * 0.06 && distance < 0.1 * 0.1)
 				{
 					keep = false;
 					break;
@@ -93,7 +93,7 @@ public:
 								 (object_points[i].y - object_points[j].y) *
 									 (object_points[i].y - object_points[j].y);
 
-				if (distance < 0.15 * 0.15)
+				if (distance < 0.13 * 0.13)
 				{
 					
 					current_group.x += object_points[j].x;
@@ -158,8 +158,8 @@ private:
 
 	sensor_msgs::PointCloud filtered_cloud;
 
-	const float max_height = 0.05;
-	const float min_height = -0.05;
+	const float max_height = 0.025;
+	const float min_height = -0.025;
 };
 
 int main(int argc, char **argv)
