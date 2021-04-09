@@ -76,15 +76,16 @@ public:
 		return object_points;
 	}
 
-	// Remove groups of less than 5 points
-	std::vector<geometry_msgs::Point32> removeGroups(std::vector<geometry_msgs::Point32> object_points)
+		// Remove groups of less than 5 points and locate groups
+	std::vector<geometry_msgs::Point32> getGroups(std::vector<geometry_msgs::Point32> object_points)
 	{
-		std::vector<geometry_msgs::Point32> size_object_points = {};
-
+		std::vector<geometry_msgs::Point32> group_points = {};
+		
 		for (int i = 0; i < object_points.size(); i++)
 		{
 			int count = 0;
-
+			geometry_msgs::Point32 current_group; 
+			
 			for (int j = 0; j < object_points.size(); j++)
 			{
 				float distance = (object_points[i].x - object_points[j].x) *
@@ -94,15 +95,37 @@ public:
 
 				if (distance < 0.15 * 0.15)
 				{
+					
+					current_group.x += object_points[j].x;
+					current_group.y += object_points[j].y;
+				
 					count++;
 				}
 			}
 
 			if (count > 5)
-				size_object_points.push_back(object_points[i]);
+			{
+			
+				current_group.x = current_group.x / count;
+				current_group.y = current_group.y / count;
+				
+				bool is_new = true;
+				
+				for(int k = 0; k < group_points.size(); k++)
+				{
+					if( current_group == group_points[k] )
+					{
+						is_new = false;
+						break;
+					}
+				}
+				if (is_new)
+				{
+					group_points.push_back(current_group);
+				}
+			}
 		}
-
-		return size_object_points;
+		return group_points;
 	}
 	
 	void cloudCallback(const sensor_msgs::PointCloud2 &msg)
@@ -118,14 +141,14 @@ public:
 
 		std::vector<geometry_msgs::Point32> object_points = filterObjects(orientation_points);
 
-		std::vector<geometry_msgs::Point32> size_object_points = removeGroups(object_points);
+		std::vector<geometry_msgs::Point32> group_points = getGroups(object_points);
 
 		filtered_cloud.header = cloud.header;
-		filtered_cloud.points = size_object_points;
+		filtered_cloud.points = group_points;
 
 		cloud_pub.publish(filtered_cloud);
 
-		ROS_INFO("%lu points in %.2f seconds", size_object_points.size(), ros::Time::now().toSec() - startTime);
+		ROS_INFO("%lu points in %.2f seconds", group_points.size(), ros::Time::now().toSec() - startTime);
 	}
 
 private:
