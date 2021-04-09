@@ -10,7 +10,7 @@
       <xacro:insert_block name="origin" />
     </joint>
 
-    <xacro:VLP-16 parent="${prefix}_vlp16_mount" topic="${topic}">
+    <xacro:VLP-16 parent="${prefix}_vlp16_mount" topic="velodyne_points">
       <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:VLP-16>
   </xacro:macro>
