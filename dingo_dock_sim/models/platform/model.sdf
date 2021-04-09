@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="platform">
+    <static>false</static>
+    <link name="link">
+      <pose>0 0 0.187 0 0 0</pose>
+      <inertial>
+        <mass>1.966</mass>
+        <inertia>
+          <ixx>0.1138</ixx>
+          <ixy>-0.0005</ixy>
+          <ixz>0.0</ixz>
+          <iyy>0.0821</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.1822</izz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://platform/meshes/platform.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://platform/meshes/platform.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
