@@ -1,3 +1,4 @@
 <launch>
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find dingo_dock)/rviz/lidar.rviz" />
+  <param name="use_gui" value="true"/>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find dingo_dock)/rviz/dingo_velodyne.rviz" />
 </launch>
