@@ -1,6 +1,7 @@
-#include "ros/ros.h"
+#include <ros/ros.h>
+#include <tf/transform_broadcaster.h>
+#include <sensor_msgs/point_cloud_conversion.h>
 #include <vector>
-#include "sensor_msgs/point_cloud_conversion.h"
 
 class CloudFilter
 {
@@ -76,7 +77,7 @@ public:
 		return object_points;
 	}
 
-		// Remove groups of less than 5 points and locate groups
+	// Remove groups of less than 5 points and locate groups
 	std::vector<geometry_msgs::Point32> getGroups(std::vector<geometry_msgs::Point32> object_points)
 	{
 		std::vector<geometry_msgs::Point32> group_points = {};
@@ -127,6 +128,54 @@ public:
 		}
 		return group_points;
 	}
+
+	// Find legs and determine platform location(s)
+	int getPlatforms(std::vector<geometry_msgs::Point32> group_points)
+	{
+		static tf::TransformBroadcaster br;
+		std::vector<geometry_msgs::Point32> platforms = {};
+
+		int n = 0;
+		
+		for (int i = 0; i < group_points.size(); i++)
+		{
+			for (int j = 0; j < group_points.size(); j++){
+				float distance = (group_points[i].x - group_points[j].x) *
+									 (group_points[i].x - group_points[j].x) +
+								 (group_points[i].y - group_points[j].y) *
+									 (group_points[i].y - group_points[j].y);
+				
+				
+				if (distance > min_leg_distance && distance < max_leg_distance){
+					tf::Transform transform;
+					
+					float platform_x = (group_points[i].x + group_points[j].x)/2;
+					float platform_y = (group_points[i].y + group_points[j].y)/2;
+					float platform_z = (group_points[i].z + group_points[j].z)/2;
+					ROS_INFO("Platform at %.2f %.2f %.2f", platform_x, platform_y, platform_z);
+					transform.setOrigin(tf::Vector3(platform_x, platform_y, platform_z));
+					
+					tf::Quaternion q;
+					float yaw = atan2(group_points[i].x-group_points[j].x,-group_points[i].y+group_points[j].y);
+					q.setRPY(0, 0 , yaw);
+					transform.setRotation(q);
+
+					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "platform_" + std::to_string(n)));
+
+					n++;
+
+					group_points.erase(group_points.begin()+i);
+					group_points.erase(group_points.begin()+j-1);
+
+					i--;
+					break;
+				}
+			}
+		}
+		
+		
+		return n;
+	}
 	
 	void cloudCallback(const sensor_msgs::PointCloud2 &msg)
 	{
@@ -143,12 +192,16 @@ public:
 
 		std::vector<geometry_msgs::Point32> group_points = getGroups(object_points);
 
+		int n = getPlatforms(group_points);
+
+		ROS_INFO("Found %i platforms", n);
+
 		filtered_cloud.header = cloud.header;
-		filtered_cloud.points = group_points;
+		filtered_cloud.points = object_points;
 
 		cloud_pub.publish(filtered_cloud);
 
-		ROS_INFO("%lu points in %.2f seconds", group_points.size(), ros::Time::now().toSec() - startTime);
+		//ROS_INFO("%lu points in %.2f seconds", group_points.size(), ros::Time::now().toSec() - startTime);
 	}
 
 private:
@@ -160,6 +213,9 @@ private:
 
 	const float max_height = 0.025;
 	const float min_height = -0.025;
+
+	const float min_leg_distance = 0.600*0.600;
+	const float max_leg_distance = 0.620*0.620;
 };
 
 int main(int argc, char **argv)
