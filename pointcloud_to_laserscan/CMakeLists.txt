@@ -23,12 +23,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(laserscan_to_pointcloud src/laserscan_to_pointcloud_nodelet.cpp)
-target_link_libraries(laserscan_to_pointcloud ${catkin_LIBRARIES})
-
-add_executable(laserscan_to_pointcloud_node src/laserscan_to_pointcloud_node.cpp)
-target_link_libraries(laserscan_to_pointcloud_node laserscan_to_pointcloud ${catkin_LIBRARIES})
-
 add_library(pointcloud_to_laserscan src/pointcloud_to_laserscan_nodelet.cpp)
 target_link_libraries(pointcloud_to_laserscan ${catkin_LIBRARIES})
 
@@ -36,8 +30,6 @@ add_executable(pointcloud_to_laserscan_node src/pointcloud_to_laserscan_node.cpp
 target_link_libraries(pointcloud_to_laserscan_node pointcloud_to_laserscan ${catkin_LIBRARIES})
 
 install(TARGETS
-  laserscan_to_pointcloud
-  laserscan_to_pointcloud_node
   pointcloud_to_laserscan
   pointcloud_to_laserscan_node
 	RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
