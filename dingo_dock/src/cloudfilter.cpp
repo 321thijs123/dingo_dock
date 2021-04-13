@@ -7,63 +7,63 @@ class CloudFilter
 {
 
 public:
+	//Constructor (Called when the CloudFilter object is created)
 	CloudFilter()
 	{
-		cloud_pub = n.advertise<sensor_msgs::PointCloud>("filtered_cloud", 100);
-
-		sub = n.subscribe("velodyne_points", 100, &CloudFilter::cloudCallback, this);
+		cloud_pub = n.advertise<sensor_msgs::PointCloud>("filtered_cloud", 100);		//Setup publisher for output point_cloud
+		sub = n.subscribe("velodyne_points", 100, &CloudFilter::cloudCallback, this);	//Subscribe to velodyne pointcloud, call CloudFilter::cloudCallback if a new pointcloud is published
 	}
 
-	// Only keep points between a height of -5 and 5 centimeters
-	std::vector<geometry_msgs::Point32> filterLayers(sensor_msgs::PointCloud cloud)
+	// Only keep points between min_height and max_height
+	std::vector<geometry_msgs::Point32> filterLayers(std::vector<geometry_msgs::Point32> points)
 	{
 		std::vector<geometry_msgs::Point32> layer_points = {};
 
-		for (int i = 0; i < cloud.points.size(); i++)
+		for (int i = 0; i < points.size(); i++)
 		{
-			if (cloud.points[i].z < max_height && cloud.points[i].z > min_height)
+			if (points[i].z < max_height && points[i].z > min_height)
 			{
-				layer_points.push_back(cloud.points[i]);
+				layer_points.push_back(points[i]);
 			}
 		}
 
 		return layer_points;
 	}
 
-	// Orientation filter
-	std::vector<geometry_msgs::Point32> filterOrientation(std::vector<geometry_msgs::Point32> layer_points)
+	// Only keep points in front of the robot
+	std::vector<geometry_msgs::Point32> filterOrientation(std::vector<geometry_msgs::Point32> points)
 	{
 		std::vector<geometry_msgs::Point32> orientation_points = {};
 
-		for (int i = 0; i < layer_points.size(); i++)
+		for (int i = 0; i < points.size(); i++)
 		{
 		
-			if (layer_points[i].x > 0 )
+			if (points[i].x > 0 )
 			{
-				orientation_points.push_back(layer_points[i]);
+				orientation_points.push_back(points[i]);
 			}
 		}
 
 		return orientation_points;
 	}
 	
-	// Only keep objects smaller than 15cm with 30cm of clearance from its center
-	std::vector<geometry_msgs::Point32> filterObjects(std::vector<geometry_msgs::Point32> orientation_points)
+	// Only keep objects smaller than [max_size] with [clearance] of clearance from its center
+	std::vector<geometry_msgs::Point32> filterObjects(std::vector<geometry_msgs::Point32> points)
 	{
 		std::vector<geometry_msgs::Point32> object_points = {};
 
-		for (int i = 0; i < orientation_points.size(); i++)
+		for (int i = 0; i < points.size(); i++)
 		{
 			bool keep = true;
 
-			for (int j = 0; j < orientation_points.size(); j++)
+			for (int j = 0; j < points.size(); j++)
 			{
-				float distance = (orientation_points[i].x - orientation_points[j].x) *
-									 (orientation_points[i].x - orientation_points[j].x) +
-								 (orientation_points[i].y - orientation_points[j].y) *
-									 (orientation_points[i].y - orientation_points[j].y);
+				float distance =(points[i].x - points[j].x) *
+								(points[i].x - points[j].x) +
+								(points[i].y - points[j].y) *
+								(points[i].y - points[j].y);
 
-				if (distance > 0.06 * 0.06 && distance < 0.1 * 0.1)
+				if (distance > max_size && distance < clearance)
 				{
 					keep = false;
 					break;
@@ -71,40 +71,39 @@ public:
 			}
 
 			if (keep)
-				object_points.push_back(orientation_points[i]);
+				object_points.push_back(points[i]);
 		}
 
 		return object_points;
 	}
 
-	// Remove groups of less than 5 points and locate groups
-	std::vector<geometry_msgs::Point32> getGroups(std::vector<geometry_msgs::Point32> object_points)
+	// Remove groups of less than [min_points] points then calculate group centers
+	std::vector<geometry_msgs::Point32> getGroups(std::vector<geometry_msgs::Point32> points)
 	{
 		std::vector<geometry_msgs::Point32> group_points = {};
 		
-		for (int i = 0; i < object_points.size(); i++)
+		for (int i = 0; i < points.size(); i++)
 		{
 			int count = 0;
 			geometry_msgs::Point32 current_group; 
 			
-			for (int j = 0; j < object_points.size(); j++)
+			for (int j = 0; j < points.size(); j++)
 			{
-				float distance = (object_points[i].x - object_points[j].x) *
-									 (object_points[i].x - object_points[j].x) +
-								 (object_points[i].y - object_points[j].y) *
-									 (object_points[i].y - object_points[j].y);
+				float distance =(points[i].x - points[j].x) *
+								(points[i].x - points[j].x) +
+								(points[i].y - points[j].y) *
+								(points[i].y - points[j].y);
 
-				if (distance < 0.13 * 0.13)
+				if (distance < clearance)
 				{
-					
-					current_group.x += object_points[j].x;
-					current_group.y += object_points[j].y;
+					current_group.x += points[j].x;
+					current_group.y += points[j].y;
 				
 					count++;
 				}
 			}
 
-			if (count > 5)
+			if (count > min_points)
 			{
 			
 				current_group.x = current_group.x / count;
@@ -130,33 +129,34 @@ public:
 	}
 
 	// Find legs and determine platform location(s)
-	int getPlatforms(std::vector<geometry_msgs::Point32> group_points)
+	int getPlatforms(std::vector<geometry_msgs::Point32> points)
 	{
 		static tf::TransformBroadcaster br;
 		std::vector<geometry_msgs::Point32> platforms = {};
 
 		int n = 0;
 		
-		for (int i = 0; i < group_points.size(); i++)
+		for (int i = 0; i < points.size(); i++)
 		{
-			for (int j = 0; j < group_points.size(); j++){
-				float distance = (group_points[i].x - group_points[j].x) *
-									 (group_points[i].x - group_points[j].x) +
-								 (group_points[i].y - group_points[j].y) *
-									 (group_points[i].y - group_points[j].y);
+			for (int j = 0; j < points.size(); j++)
+			{
+				float distance =(points[i].x - points[j].x) *
+								(points[i].x - points[j].x) +
+								(points[i].y - points[j].y) *
+								(points[i].y - points[j].y);
 				
 				
-				if (distance > min_leg_distance && distance < max_leg_distance){
+				if (distance > min_leg_distance && distance < max_leg_distance)
+				{
 					tf::Transform transform;
 					
-					float platform_x = (group_points[i].x + group_points[j].x)/2;
-					float platform_y = (group_points[i].y + group_points[j].y)/2;
-					float platform_z = (group_points[i].z + group_points[j].z)/2;
-					ROS_INFO("Platform at %.2f %.2f %.2f", platform_x, platform_y, platform_z);
+					float platform_x = (points[i].x + points[j].x)/2;
+					float platform_y = (points[i].y + points[j].y)/2;
+					float platform_z = (points[i].z + points[j].z)/2;
 					transform.setOrigin(tf::Vector3(platform_x, platform_y, platform_z));
 					
 					tf::Quaternion q;
-					float yaw = atan2(group_points[i].x-group_points[j].x,-group_points[i].y+group_points[j].y);
+					float yaw = atan2(points[i].x-points[j].x,-points[i].y+points[j].y);
 					q.setRPY(0, 0 , yaw);
 					transform.setRotation(q);
 
@@ -164,8 +164,8 @@ public:
 
 					n++;
 
-					group_points.erase(group_points.begin()+i);
-					group_points.erase(group_points.begin()+j-1);
+					points.erase(points.begin()+i);
+					points.erase(points.begin()+j-1);
 
 					i--;
 					break;
@@ -184,24 +184,19 @@ public:
 
 		convertPointCloud2ToPointCloud(msg, cloud);
 
-		std::vector<geometry_msgs::Point32> layer_points = filterLayers(cloud);
-
+		std::vector<geometry_msgs::Point32> layer_points = filterLayers(cloud.points);
 		std::vector<geometry_msgs::Point32> orientation_points = filterOrientation(layer_points);
-
 		std::vector<geometry_msgs::Point32> object_points = filterObjects(orientation_points);
-
 		std::vector<geometry_msgs::Point32> group_points = getGroups(object_points);
 
 		int n = getPlatforms(group_points);
-
-		ROS_INFO("Found %i platforms", n);
 
 		filtered_cloud.header = cloud.header;
 		filtered_cloud.points = object_points;
 
 		cloud_pub.publish(filtered_cloud);
 
-		//ROS_INFO("%lu points in %.2f seconds", group_points.size(), ros::Time::now().toSec() - startTime);
+		ROS_INFO("Found %i platform(s) in %.3f seconds", n, ros::Time::now().toSec() - startTime);
 	}
 
 private:
@@ -211,18 +206,23 @@ private:
 
 	sensor_msgs::PointCloud filtered_cloud;
 
-	const float max_height = 0.025;
+	const float max_height = 0.025;			//Height of platform legs relative to lidar
 	const float min_height = -0.025;
 
-	const float min_leg_distance = 0.600*0.600;
-	const float max_leg_distance = 0.620*0.620;
+	const float max_size = 0.06 * 0.06;		//Maximum size of legs, larger objects will be disgarded (Squared to avoid square root for pythagoras)
+	const float clearance = 0.1 * 0.1;		//Minimum distance to other objects to be regarded a seperate object (Squared to avoid square root for pythagoras) 
+
+	const int min_points = 5;				//Minimum poins per object
+
+	const float min_leg_distance = 0.600*0.600;		//Minimum distance between two possible legs to be considered the same platform (Squared to avoid square root for pythagoras)
+	const float max_leg_distance = 0.620*0.620;		//Maximum distance between two possible legs to be considered the same platform (Squared to avoid square root for pythagoras)
 };
 
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "cloud_filter");
 
-	CloudFilter filterObject;
+	CloudFilter filterObject;	//Create cloud filter object
 
 	ros::spin();
 
