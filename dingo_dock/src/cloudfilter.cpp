@@ -10,7 +10,11 @@ public:
 	//Constructor (Called when the CloudFilter object is created)
 	CloudFilter()
 	{
-		cloud_pub = n.advertise<sensor_msgs::PointCloud>("filtered_cloud", 100);		//Setup publisher for output point_cloud
+		layer_pub = n.advertise<sensor_msgs::PointCloud>("cloudfilter/layer", 100);		//Setup publishers for output point clouds
+		direction_pub = n.advertise<sensor_msgs::PointCloud>("cloudfilter/direction", 100);
+		object_pub = n.advertise<sensor_msgs::PointCloud>("cloudfilter/object", 100);
+		group_pub = n.advertise<sensor_msgs::PointCloud>("cloudfilter/group", 100);
+
 		sub = n.subscribe("velodyne_points", 100, &CloudFilter::cloudCallback, this);	//Subscribe to velodyne pointcloud, call CloudFilter::cloudCallback if a new pointcloud is published
 	}
 
@@ -31,20 +35,20 @@ public:
 	}
 
 	// Only keep points in front of the robot
-	std::vector<geometry_msgs::Point32> filterOrientation(std::vector<geometry_msgs::Point32> points)
+	std::vector<geometry_msgs::Point32> filterDirection(std::vector<geometry_msgs::Point32> points)
 	{
-		std::vector<geometry_msgs::Point32> orientation_points = {};
+		std::vector<geometry_msgs::Point32> direction_points = {};
 
 		for (int i = 0; i < points.size(); i++)
 		{
 		
 			if (points[i].x > 0 )
 			{
-				orientation_points.push_back(points[i]);
+				direction_points.push_back(points[i]);
 			}
 		}
 
-		return orientation_points;
+		return direction_points;
 	}
 	
 	// Only keep objects smaller than [max_size] with [clearance] of clearance from its center
@@ -184,27 +188,35 @@ public:
 
 		convertPointCloud2ToPointCloud(msg, cloud);
 
-		std::vector<geometry_msgs::Point32> layer_points = filterLayers(cloud.points);
-		std::vector<geometry_msgs::Point32> orientation_points = filterOrientation(layer_points);
-		std::vector<geometry_msgs::Point32> object_points = filterObjects(orientation_points);
-		std::vector<geometry_msgs::Point32> group_points = getGroups(object_points);
+		sensor_msgs::PointCloud layer_cloud;
+		sensor_msgs::PointCloud direction_cloud;
+		sensor_msgs::PointCloud object_cloud;
+		sensor_msgs::PointCloud group_cloud;
 
-		int n = getPlatforms(group_points);
+		layer_cloud.header = direction_cloud.header = object_cloud.header = group_cloud.header = cloud.header;
 
-		filtered_cloud.header = cloud.header;
-		filtered_cloud.points = object_points;
+		layer_cloud.points = filterLayers(cloud.points);
+		direction_cloud.points = filterDirection(layer_cloud.points);
+		object_cloud.points = filterObjects(direction_cloud.points);
+		group_cloud.points = getGroups(object_cloud.points);
 
-		cloud_pub.publish(filtered_cloud);
+		int n = getPlatforms(group_cloud.points);
+
+		layer_pub.publish(layer_cloud);
+		direction_pub.publish(direction_cloud);
+		object_pub.publish(object_cloud);
+		group_pub.publish(group_cloud);
 
 		ROS_INFO("Found %i platform(s) in %.3f seconds", n, ros::Time::now().toSec() - startTime);
 	}
 
 private:
 	ros::NodeHandle n;
-	ros::Publisher cloud_pub;
+	ros::Publisher layer_pub;
+	ros::Publisher direction_pub;
+	ros::Publisher object_pub;
+	ros::Publisher group_pub;
 	ros::Subscriber sub;
-
-	sensor_msgs::PointCloud filtered_cloud;
 
 	const float max_height = 0.025;			//Height of platform legs relative to lidar
 	const float min_height = -0.025;
