@@ -3,6 +3,7 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <vector>
 
+
 class CloudFilter
 {
 
@@ -132,13 +133,14 @@ public:
 		return group_points;
 	}
 
-	// Find legs and determine platform location(s)
-	int getPlatforms(std::vector<geometry_msgs::Point32> points)
+	// Find leg pairs and publish transforms
+	std::vector<geometry_msgs::Point32> getLegPairs(std::vector<geometry_msgs::Point32> points)
 	{
 		static tf::TransformBroadcaster br;
-		std::vector<geometry_msgs::Point32> platforms = {};
 
-		int n = 0;
+		int num = 0;
+
+		std::vector<geometry_msgs::Point32> leg_pairs = {};
 		
 		for (int i = 0; i < points.size(); i++)
 		{
@@ -150,23 +152,27 @@ public:
 								(points[i].y - points[j].y);
 				
 				
-				if (distance > min_leg_distance && distance < max_leg_distance)
+				if (distance > y_min_leg_distance && distance < y_max_leg_distance)
 				{
 					tf::Transform transform;
 					
-					float platform_x = (points[i].x + points[j].x)/2;
-					float platform_y = (points[i].y + points[j].y)/2;
-					float platform_z = (points[i].z + points[j].z)/2;
-					transform.setOrigin(tf::Vector3(platform_x, platform_y, platform_z));
+					geometry_msgs::Point32 leg_pair;
+
+					leg_pair.x = (points[i].x + points[j].x)/2;
+					leg_pair.y = (points[i].y + points[j].y)/2;
+					leg_pair.z = (points[i].z + points[j].z)/2;
+					leg_pairs.push_back(leg_pair);
+
+					transform.setOrigin(tf::Vector3(leg_pair.x, leg_pair.y, leg_pair.z));
 					
 					tf::Quaternion q;
 					float yaw = atan2(points[i].x-points[j].x,-points[i].y+points[j].y);
 					q.setRPY(0, 0 , yaw);
 					transform.setRotation(q);
 
-					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "platform_" + std::to_string(n)));
+					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "leg_pair_" + std::to_string(num)));
 
-					n++;
+					num++;
 
 					points.erase(points.begin()+i);
 					points.erase(points.begin()+j-1);
@@ -178,9 +184,62 @@ public:
 		}
 		
 		
-		return n;
+		return leg_pairs;
 	}
 	
+	// Find platforms and publish transforms
+	std::vector<geometry_msgs::Point32> getPlatforms(std::vector<geometry_msgs::Point32> leg_pairs)
+	{
+		static tf::TransformBroadcaster br;
+
+		int num = 0;
+
+		std::vector<geometry_msgs::Point32> platforms = {};
+		
+		for (int i = 0; i < leg_pairs.size(); i++)
+		{
+			for (int j = 0; j < leg_pairs.size(); j++)
+			{
+				float distance =(leg_pairs[i].x - leg_pairs[j].x) *
+								(leg_pairs[i].x - leg_pairs[j].x) +
+								(leg_pairs[i].y - leg_pairs[j].y) *
+								(leg_pairs[i].y - leg_pairs[j].y);
+				
+				
+				if (distance > x_min_leg_distance && distance < x_max_leg_distance)
+				{
+					tf::Transform transform;
+					
+					geometry_msgs::Point32 platform;
+					
+					platform.x = (leg_pairs[i].x + leg_pairs[j].x)/2;
+					platform.y = (leg_pairs[i].y + leg_pairs[j].y)/2;
+					platform.z = (leg_pairs[i].z + leg_pairs[j].z)/2;
+					platforms.push_back(platform);
+
+					transform.setOrigin(tf::Vector3(platform.x, platform.y, platform.z));
+					
+					tf::Quaternion q;
+					float yaw = atan2(-leg_pairs[i].y+leg_pairs[j].y ,-leg_pairs[i].x+leg_pairs[j].x);
+					q.setRPY(0, 0 , yaw);
+					transform.setRotation(q);
+
+					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "platform_" + std::to_string(num)));
+
+					num++;
+
+					leg_pairs.erase(leg_pairs.begin()+i);
+					leg_pairs.erase(leg_pairs.begin()+j-1);
+
+					i--;
+					break;
+				}
+			}
+		}
+		
+		return platforms;
+	}
+
 	void cloudCallback(const sensor_msgs::PointCloud2 &msg)
 	{
 		double startTime = ros::Time::now().toSec();
@@ -200,14 +259,21 @@ public:
 		object_cloud.points = filterObjects(direction_cloud.points);
 		group_cloud.points = getGroups(object_cloud.points);
 
-		int n = getPlatforms(group_cloud.points);
-
 		layer_pub.publish(layer_cloud);
 		direction_pub.publish(direction_cloud);
 		object_pub.publish(object_cloud);
 		group_pub.publish(group_cloud);
 
-		ROS_INFO("Found %i platform(s) in %.3f seconds", n, ros::Time::now().toSec() - startTime);
+		std::vector<geometry_msgs::Point32> leg_pairs = getLegPairs(group_cloud.points);
+		std::vector<geometry_msgs::Point32> platforms = getPlatforms(leg_pairs);
+
+		system("clear");
+		std::cout <<"------------------\n" << 
+					"Input pts: " << cloud.points.size() << "\n" <<
+					"Time:      " << ros::Time::now().toSec() - startTime << "\n"
+					"Leg Pairs: " << leg_pairs.size() << "\n" <<
+					"Platforms: " << platforms.size() << "\n"
+					"------------------\n";
 	}
 
 private:
@@ -218,16 +284,19 @@ private:
 	ros::Publisher group_pub;
 	ros::Subscriber sub;
 
-	const float max_height = 0.025;			//Height of platform legs relative to lidar
-	const float min_height = -0.025;
+	const float max_height = 0.035;			//Height of platform legs relative to lidar
+	const float min_height = -0.035;
 
 	const float max_size = 0.06 * 0.06;		//Maximum size of legs, larger objects will be disgarded (Squared to avoid square root for pythagoras)
 	const float clearance = 0.1 * 0.1;		//Minimum distance to other objects to be regarded a seperate object (Squared to avoid square root for pythagoras) 
 
 	const int min_points = 5;				//Minimum poins per object
 
-	const float min_leg_distance = 0.600*0.600;		//Minimum distance between two possible legs to be considered the same platform (Squared to avoid square root for pythagoras)
-	const float max_leg_distance = 0.620*0.620;		//Maximum distance between two possible legs to be considered the same platform (Squared to avoid square root for pythagoras)
+	const float y_min_leg_distance = 0.600*0.600;		//Minimum distance (left to right) between two possible legs to be a leg same platform (Squared to avoid square root for pythagoras)
+	const float y_max_leg_distance = 0.620*0.620;		//Maximum distance (left to right) between two possible legs to be a leg pair of the same platform (Squared to avoid square root for pythagoras)
+
+	const float x_min_leg_distance = 0.540*0.540;		//Minimum distance (front to back) between two possible leg pairs to be the same platform (Squared to avoid square root for pythagoras)
+	const float x_max_leg_distance = 0.600*0.600;		//Maximum distance (front to back) between two possible leg pairs to be the same platform (Squared to avoid square root for pythagoras)
 };
 
 int main(int argc, char **argv)
