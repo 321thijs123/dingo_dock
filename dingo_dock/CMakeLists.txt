@@ -6,6 +6,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   tf
+  actionlib
+  move_base_msgs
 )
 
 catkin_package(
@@ -22,3 +24,6 @@ include_directories(
 
 add_executable(cloudfilter src/cloudfilter.cpp)
 target_link_libraries(cloudfilter ${catkin_LIBRARIES})
+
+add_executable(navGoalSender src/navGoalSender.cpp)
+target_link_libraries(navGoalSender ${catkin_LIBRARIES})
