@@ -18,6 +18,7 @@ int main(int argc, char **argv)
   bool found = false;
 
   tf::Vector3 v;
+  tf::Quaternion q;
 
   ros::Rate rate(1.0);
   while (!found)
@@ -29,6 +30,8 @@ int main(int argc, char **argv)
       listener.lookupTransform("odom", "platform_0", ros::Time(0), transform);
 
       v = transform.getOrigin();
+      q = transform.getRotation();
+
       ROS_INFO("Translation platform: %.3f, %.3f, %.3f", v.getX(), v.getY(), v.getZ());
 
       listener.lookupTransform("odom", "velodyne", ros::Time(0), transform);
@@ -61,10 +64,17 @@ int main(int argc, char **argv)
   goal.target_pose.header.frame_id = "odom";
   goal.target_pose.header.stamp = ros::Time::now();
 
-  goal.target_pose.pose.position.x = v.getX();
-  goal.target_pose.pose.position.y = v.getY();
+  double roll, pitch, yaw;
+
+  tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+  goal.target_pose.pose.position.x = v.getX() - cos(yaw) * 1.0;
+  goal.target_pose.pose.position.y = v.getY() - sin(yaw) * 1.0;
   goal.target_pose.pose.position.z = v.getZ();
-  goal.target_pose.pose.orientation.w = 1.0;
+  goal.target_pose.pose.orientation.x = q[0];
+  goal.target_pose.pose.orientation.y = q[1];
+  goal.target_pose.pose.orientation.z = q[2];
+  goal.target_pose.pose.orientation.w = q[3];
 
   ROS_INFO("Sending goal");
   ac.sendGoal(goal);
