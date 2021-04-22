@@ -1,18 +1,27 @@
-# Usage
-## Cloudfilter
-The cloudfilter node is used to filter out all points except the tube.
-```
-rosrun dingo_dock cloudfilter
-```
+# Nodes
+## cloudfilter
+### Subscribed Topics
+velodyne_points (sensor_msgs/PointCloud2)
 
+### Published Topics
+layer_cloud (sensor_msgs/PointCloud)\
+direction_cloud (sensor_msgs/PointCloud)\
+object_cloud (sensor_msgs/PointCloud)\
+group_cloud (sensor_msgs/PointCloud)
+
+### Published transforms
+velodyne -> leg_pair_x\
+velodyne -> platform_x
+
+## navGoalSender
+#### Transforms Listeners
+world -> platform_x
+
+### MoveBase
+This node uses a movebase action client for the action named "move_base"
+
+# Launch Files
 ## rviz.launch
-This launch file runs rviz with the correct configuration for visualizing the cloudfilter node.
-```
-roslaunch dingo_dock rviz.launch
-```
-
-## track_test.launch
-This launch file runs a rosbag, rviz and the cloudfilter node. The rosbag needs to be placed in the package at `rosbag/tube.bag`.
-```
-roslaunch dingo_dock track_test.launch
-```
+This launch file launches RVIZ with a configuration for visualizing the platform recognition.
+## rviz_nav.launch
+This launch file launches RVIZ with a configuration for visualizing the platform recognition and sending navgoals.
