@@ -129,17 +129,9 @@
   <link name="base_link"></link>
 
   <joint name="base_link_joint" type="fixed">
-    <origin xyz="0 0 0" rpy="0 0 0" />
+    <origin xyz="${-wheel_x_offset} 0 0" rpy="0 0 0" />
     <parent link="base_link"/>
     <child link="chassis_link" />
-  </joint>
-  
-  <link name= "proper_base_link"></link>
-  
-  <joint name="proper_base_link_joint" type="fixed">
-    <origin xyz="${wheel_x_offset} 0 0" rpy="0 0 0" />
-    <parent link="base_link"/>
-    <child link="proper_base_link" />
   </joint>
 
   <link name="chassis_link">
