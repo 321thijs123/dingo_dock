@@ -27,3 +27,6 @@ target_link_libraries(cloudfilter ${catkin_LIBRARIES})
 
 add_executable(navGoalSender src/navGoalSender.cpp)
 target_link_libraries(navGoalSender ${catkin_LIBRARIES})
+
+add_executable(drivetest src/drivetest.cpp)
+target_link_libraries(drivetest ${catkin_LIBRARIES})
