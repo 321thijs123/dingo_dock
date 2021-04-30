@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <!-- Convert pointcloud2 to laserscan for gmapping -->
+    <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
+
+        <remap from="cloud_in" to="velodyne_points"/>
+        <remap from="scan" to="front/scan"/>
+        <rosparam>
+            target_frame: velodyne # Leave disabled to output scan in pointcloud frame
+            transform_tolerance: 0.01
+            min_height: 0.01
+            max_height: 0.5
+
+            angle_min: -M_PI
+            angle_max: M_PI
+            angle_increment: M_PI/360.0
+            scan_time: 0.3333
+            range_min: 0.45
+            range_max: 4.0
+            use_inf: true
+            inf_epsilon: 1.0
+
+            # Concurrency level, affects number of pointclouds queued for processing and number of threads used
+            # 0 : Detect number of cores
+            # 1 : Single threaded
+            # 2->inf : Parallelism level
+            concurrency_level: 1
+        </rosparam>
+    </node>
+    
+    <!-- Convert pointcloud2 to pointcloud for Move Base -->
+    <node pkg="point_cloud_converter" name="point_cloud_converter" type="point_cloud_converter_node" >
+        <remap from="points2_in" to="velodyne_points"/>
+        <remap from="points_out" to="velodyne_pointcloud1" />
+    </node>
+
+    <!-- Run gmapping -->
+    <include file="$(dirname)/../launch/include/gmapping.launch">
+        <arg name="scan_topic" value="front/scan" />
+    </include>
+
+    <!-- Run Move Base -->
+    <include file="$(dirname)/../launch/include/move_base.launch" />
+
+    <!-- Open RVIZ -->
+    <include file="$(dirname)/rviz.launch" >
+        <arg name="config" value="gmapping" />
+    </include>
+    
+</launch>

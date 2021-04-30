@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<launch>
+    
+    <!-- Convert pointcloud2 to pointcloud for Move Base -->
+    <node pkg="point_cloud_converter" name="point_cloud_converter" type="point_cloud_converter_node" >
+        <remap from="points2_in" to="velodyne_points"/>
+        <remap from="points_out" to="velodyne_pointcloud1" />
+    </node>
+
+    <!-- Run Move Base -->
+    <include file="$(dirname)/odom_nav.launch" />
+
+    <!-- Open RVIZ -->
+    <include file="$(dirname)/rviz.launch" >
+        <arg name="config" value="navigation" />
+    </include>
+    
+</launch>
