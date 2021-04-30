@@ -1,4 +1,19 @@
 <launch>
+  <arg name="config" default="none"/>
+
   <param name="use_gui" value="true"/>
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find dingo_dock)/rviz/dingo_velodyne.rviz" />
+  
+  <group if="$(eval arg('config') == 'none')">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find dingo_dock)/rviz/dingo_velodyne.rviz" />
+  </group>
+  
+  <group if="$(eval arg('config') == 'navigation')">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find dingo_dock)/rviz/navigation.rviz" />
+  </group>
+  
+  <group if="$(eval arg('config') == 'gmapping')">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find dingo_dock)/rviz/gmapping.rviz" />
+  </group>
+  
+  
 </launch>
