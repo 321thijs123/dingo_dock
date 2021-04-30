@@ -18,7 +18,7 @@ plugins:
 
 obstacles_layer:
   observation_sources: point_cloud_sensor
-  point_cloud_sensor: {sensor_frame: velodyne, data_type: PointCloud, topic: velodyne_pointcloud1, marking: true, clearing: true, min_obstacle_height: 0.01, max_obstacle_height: 0.5, obstacle_range: 25.0, raytrace_range: 30.0}
+  point_cloud_sensor: {sensor_frame: velodyne, data_type: PointCloud, topic: velodyne_pointcloud1, marking: true, clearing: true, min_obstacle_height: 0.02, max_obstacle_height: 0.5, obstacle_range: 25.0, raytrace_range: 30.0}
 
 inflater_layer:
  inflation_radius: 0.30
