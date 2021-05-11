@@ -4,29 +4,29 @@
 
 #define M_PI 3.14159265358979323846
 
-double determinePlatformDirectionToRobot(tf::StampedTransform tf_leg_pair, tf::StampedTransform tf_robot)
+double determineDirection(tf::StampedTransform tf_platform, tf::StampedTransform tf_robot)
 {
 	// to do: niet allemaal tf's sturen naar de functies.
 
-	tf::Quaternion q_leg_pair = tf_leg_pair.getRotation();
+	tf::Quaternion q_leg_pair = tf_platform.getRotation();
 
 	double roll_platform, pitch_platform, yaw_platform;
 
 	tf::Matrix3x3(q_leg_pair).getRPY(roll_platform, pitch_platform, yaw_platform);
 	
-	tf::Vector3 v_leg_pair = tf_leg_pair.getOrigin();
+	tf::Vector3 v_leg_pair = tf_platform.getOrigin();
 	tf::Vector3 v_robot = tf_robot.getOrigin();
 
 	double deltaX = v_leg_pair.getX() - v_robot.getX();
 	double deltaY = v_leg_pair.getY() - v_robot.getY();
 
-	ROS_INFO("%f",atan2(deltaY, deltaX)-yaw_platform);
+	//ROS_INFO("%f",atan2(deltaY, deltaX)-yaw_platform);
 	return atan2(deltaY, deltaX)-yaw_platform;
 }
 
-double determineYawDifference(tf::StampedTransform tf_leg_pair, tf::StampedTransform tf_robot)
+double determineYawDifference(tf::StampedTransform tf_platform, tf::StampedTransform tf_robot)
 {
-	tf::Quaternion q_leg_pair = tf_leg_pair.getRotation();
+	tf::Quaternion q_leg_pair = tf_platform.getRotation();
 	tf::Quaternion q_robot = tf_robot.getRotation();
 
 	double roll_platform, pitch_platform, yaw_platform;
@@ -35,13 +35,13 @@ double determineYawDifference(tf::StampedTransform tf_leg_pair, tf::StampedTrans
 	tf::Matrix3x3(q_leg_pair).getRPY(roll_platform, pitch_platform, yaw_platform);
 	tf::Matrix3x3(q_robot).getRPY(roll_robot, pitch_robot, yaw_robot);
 
-	ROS_INFO("%f",(yaw_platform - yaw_robot));
+	//ROS_INFO("%f",(yaw_platform - yaw_robot));
 	return (yaw_platform - yaw_robot);
 }
 
-double determinePlatformDistance( tf::StampedTransform tf_leg_pair, tf::StampedTransform tf_robot)
+double determineDistance( tf::StampedTransform tf_platform, tf::StampedTransform tf_robot)
 {
-	tf::Vector3 v_leg_pair = tf_leg_pair.getOrigin();
+	tf::Vector3 v_leg_pair = tf_platform.getOrigin();
 	tf::Vector3 v_robot = tf_robot.getOrigin();
 
 	double deltaX = v_leg_pair.getX() - v_robot.getX();
@@ -69,7 +69,9 @@ int main(int argc, char **argv)
 	tf::Vector3 v;
 	tf::Quaternion q;
 
-	tf::StampedTransform tf_leg_pair;
+	tf::StampedTransform tf_platform;
+	tf::StampedTransform tf_robot;
+	tf::StampedTransform tf_chassis;
 
 	ros::Rate rate(20.0);
 	while (!found)
@@ -77,11 +79,7 @@ int main(int argc, char **argv)
 		try
 		{
 
-			listener.lookupTransform("odom", "leg_pair_0", ros::Time(0), tf_leg_pair);
-
-			tf::Vector3 v_leg_pair = tf_leg_pair.getOrigin();
-
-			ROS_INFO("Translation legpair: %.3f, %.3f, %.3f", v_leg_pair.getX(), v_leg_pair.getY(), v_leg_pair.getZ());
+			listener.lookupTransform("odom", "leg_pair_0", ros::Time(0), tf_platform);
 
 			found = true;
 		}
@@ -99,28 +97,27 @@ int main(int argc, char **argv)
 	while (ros::ok())
 	{
 
-		tf::StampedTransform tf_robot;
 		geometry_msgs::Twist msg;
 
 		try
 		{
-
+			listener.lookupTransform("odom", "chassis_link", ros::Time(0), tf_chassis);
 			listener.lookupTransform("odom", "base_link", ros::Time(0), tf_robot);
-
-			tf::Vector3 v_robot = tf_robot.getOrigin();
-			
-			ROS_INFO("Translation robot: %.3f, %.3f, %.3f", v_robot.getX(), v_robot.getY(), v_robot.getZ());
 		}
-
 		catch (tf::TransformException &ex)
 		{
 			ROS_ERROR("%s", ex.what());
 			continue;
 		}
+		try
+		{
+			listener.lookupTransform("odom", "platform_0", ros::Time(0), tf_platform);
+			
+		}
+		catch (tf::TransformException &ex){}
 
-		double direction_platform = determinePlatformDirectionToRobot(tf_leg_pair, tf_robot);
 
-		tf::Quaternion q_leg_pair = tf_leg_pair.getRotation();
+		tf::Quaternion q_leg_pair = tf_platform.getRotation();
 		tf::Quaternion q_robot = tf_robot.getRotation();
 
 		double roll_platform, pitch_platform, yaw_platform;
@@ -129,12 +126,54 @@ int main(int argc, char **argv)
 		tf::Matrix3x3(q_leg_pair).getRPY(roll_platform, pitch_platform, yaw_platform);
 		tf::Matrix3x3(q_robot).getRPY(roll_robot, pitch_robot, yaw_robot);
 
-		double targetDirection = yaw_platform - direction_platform * 1.0;
+		double platformDistance = determineDistance(tf_robot, tf_platform);
+		double platform_direction = determineDirection(tf_platform, tf_robot);
+		double platformCenterDistance = determineDistance(tf_chassis, tf_platform);
+		double targetDirection;
 
-
-		msg.angular.z = (yaw_robot - targetDirection) * 1.0;
-		msg.linear.x = determinePlatformDistance( tf_robot, tf_leg_pair) / 1.0;
+		if (platformDistance > 0.12)
+		{
+			targetDirection = yaw_platform + platform_direction * 2.0;
+		}
+		else
+		{
+			targetDirection = yaw_platform;
+		}
 		
+		double yawDiff = targetDirection - yaw_robot;
+
+		msg.angular.z = (yawDiff) * 10.0;
+
+		if (platformDistance > 0.12)
+		{
+			if (abs(yawDiff) < 1.0/50.0)
+			{
+				msg.linear.x =  platformDistance * 1.0 / (1.0-50.0*abs(yawDiff));
+			}
+			else {
+				msg.linear.x = 0.0;
+			}
+		}
+		else
+		{
+			msg.linear.x = platformCenterDistance * 2.0;
+		}
+
+
+		if (msg.linear.x > 0.5) msg.linear.x = 0.5;
+
+		system("clear");
+
+		std::cout << "\n----------------\n"
+				"platform dir:    " << platform_direction << "\n" <<
+				"target dir:      " << targetDirection << "\n" <<
+				"cur dir:         " << yaw_robot << "\n" <<
+				"distance:        " << platformDistance << "\n" <<
+				"center distance: " << platformCenterDistance << "\n" <<
+				"angular:         " << msg.angular.z << "\n" <<
+				"linear:          " << msg.linear.x << "\n" <<
+				"----------------\n";
+
 		cmd_vel_pub.publish(msg);
 
 		ros::spinOnce();
