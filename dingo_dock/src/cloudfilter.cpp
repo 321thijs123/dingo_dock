@@ -224,7 +224,14 @@ public:
 					q.setRPY(0, 0 , yaw);
 					transform.setRotation(q);
 
-					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "platform_" + std::to_string(num)));
+					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "velodyne", "leg_pair_pair_" + std::to_string(num)));
+
+					transform.setOrigin(tf::Vector3(middel_platform, 0, 0));
+					
+					q.setRPY(0, 0, 0);
+					transform.setRotation(q);
+
+					br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "leg_pair_pair_" + std::to_string(num), "platform_" + std::to_string(num)));
 
 					num++;
 
@@ -297,6 +304,8 @@ private:
 
 	const float x_min_leg_distance = 0.540*0.540;		//Minimum distance (front to back) between two possible leg pairs to be the same platform (Squared to avoid square root for pythagoras)
 	const float x_max_leg_distance = 0.600*0.600;		//Maximum distance (front to back) between two possible leg pairs to be the same platform (Squared to avoid square root for pythagoras)
+
+	const float middel_platform = 0.025;		//
 };
 
 int main(int argc, char **argv)
