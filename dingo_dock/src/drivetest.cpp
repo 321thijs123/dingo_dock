@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/transform_listener.h>
+#include "helpers/dingo_exception.cpp"
 
 #define M_PI 3.14159265358979323846
 
